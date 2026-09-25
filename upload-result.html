@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>كاشف الصور — Real vs AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151A;
+    --panel:#1A1F26;
+    --panel-2:#1F2530;
+    --border:#2A313B;
+    --text:#E7EAEE;
+    --text-dim:#8A93A0;
+    --accent:#3ED6C4;
+    --accent-dim:#2A9E92;
+    --real:#4ADE80;
+    --fake:#FF6B5B;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    display:flex;
+    justify-content:center;
+    padding:48px 20px 80px;
+  }
+  main{
+    width:100%;
+    max-width:560px;
+  }
+  header{
+    margin-bottom:36px;
+    text-align:right;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:.04em;
+    color:var(--accent);
+    margin:0 0 10px;
+  }
+  h1{
+    font-size:26px;
+    font-weight:700;
+    line-height:1.35;
+    margin:0 0 8px;
+  }
+  p.sub{
+    color:var(--text-dim);
+    font-size:14.5px;
+    line-height:1.6;
+    margin:0;
+    max-width:46ch;
+    margin-inline-start:auto;
+  }
+
+  .dropzone{
+    position:relative;
+    background:var(--panel);
+    border:1.5px dashed var(--border);
+    border-radius:var(--radius);
+    padding:48px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .18s ease, background .18s ease;
+    overflow:hidden;
+  }
+  .dropzone:hover, .dropzone.dragover{
+    border-color:var(--accent-dim);
+    background:var(--panel-2);
+  }
+  .dropzone input{ display:none; }
+  .dz-icon{
+    width:40px; height:40px;
+    margin:0 auto 16px;
+    color:var(--text-dim);
+  }
+  .dz-title{ font-size:15.5px; font-weight:600; margin:0 0 6px; }
+  .dz-hint{ font-size:13px; color:var(--text-dim); margin:0; }
+
+  .preview-wrap{
+    margin-top:20px;
+    border-radius:var(--radius);
+    overflow:hidden;
+    border:1px solid var(--border);
+    position:relative;
+    display:none;
+    background:#000;
+  }
+  .preview-wrap img{
+    display:block;
+    width:100%;
+    max-height:340px;
+    object-fit:contain;
+    background:#000;
+  }
+  .scan-line{
+    position:absolute;
+    left:0; right:0; top:0;
+    height:2px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    box-shadow:0 0 12px 1px var(--accent);
+    animation:scan 1.6s linear infinite;
+    display:none;
+  }
+  @keyframes scan{
+    0%{ top:0; opacity:.9; }
+    100%{ top:100%; opacity:.9; }
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+  }
+  button{
+    font-family:inherit;
+    font-size:14.5px;
+    font-weight:600;
+    border-radius:8px;
+    border:none;
+    padding:12px 18px;
+    cursor:pointer;
+    transition:opacity .15s ease, transform .1s ease;
+  }
+  button:active{ transform:scale(.98); }
+  button:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn-primary{
+    background:var(--accent);
+    color:#0B1210;
+    flex:1;
+  }
+  .btn-primary:not(:disabled):hover{ opacity:.9; }
+  .btn-ghost{
+    background:transparent;
+    color:var(--text-dim);
+    border:1px solid var(--border);
+  }
+  .btn-ghost:hover{ color:var(--text); border-color:var(--text-dim); }
+
+  .status-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:16px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    color:var(--text-dim);
+    min-height:18px;
+  }
+  .status-dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--text-dim);
+    flex-shrink:0;
+  }
+  .status-dot.busy{
+    background:var(--accent);
+    animation:pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  .result{
+    margin-top:22px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:22px;
+    display:none;
+  }
+  .result-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:16px;
+  }
+  .verdict{
+    font-size:19px;
+    font-weight:700;
+  }
+  .verdict.real{ color:var(--real); }
+  .verdict.fake{ color:var(--fake); }
+  .confidence-value{
+    font-family:'JetBrains Mono',monospace;
+    font-size:14px;
+    color:var(--text-dim);
+  }
+  .meter{
+    height:8px;
+    border-radius:5px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    overflow:hidden;
+  }
+  .meter-fill{
+    height:100%;
+    width:0%;
+    border-radius:5px;
+    transition:width .6s ease;
+  }
+  .meter-fill.real{ background:var(--real); }
+  .meter-fill.fake{ background:var(--fake); }
+  .result-note{
+    margin:14px 0 0;
+    font-size:13px;
+    color:var(--text-dim);
+    line-height:1.6;
+  }
+
+  .error-box{
+    margin-top:16px;
+    background:#241819;
+    border:1px solid #4A2A2A;
+    color:#FFB4A8;
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:13.5px;
+    display:none;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .scan-line{ animation:none; top:50%; }
+    .status-dot.busy{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">كشف الصور المولّدة بالذكاء الاصطناعي</p>
+    <h1>الصورة دي حقيقية ولا AI؟</h1>
+    <p class="sub">ارفع صورة، والنظام هيحللها ويقولك لو فيها آثار توليد اصطناعي مع نسبة الثقة.</p>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*">
+    <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+      <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <p class="dz-title">اسحب الصورة هنا أو دوس للاختيار</p>
+    <p class="dz-hint">JPG أو PNG — لحد 10MB</p>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap">
+    <div class="scan-line" id="scanLine"></div>
+    <img id="previewImg" alt="معاينة الصورة المرفوعة">
+  </div>
+
+  <div class="actions" id="actions" style="display:none;">
+    <button class="btn-primary" id="analyzeBtn">تحليل الصورة</button>
+    <button class="btn-ghost" id="resetBtn">إلغاء</button>
+  </div>
+
+  <div class="status-row" id="statusRow"></div>
+  <div class="error-box" id="errorBox"></div>
+
+  <section class="result" id="resultBox">
+    <div class="result-top">
+      <span class="verdict" id="verdictText">—</span>
+      <span class="confidence-value" id="confidenceText">—</span>
+    </div>
+    <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+    <p class="result-note" id="resultNote"></p>
+  </section>
+</main>
+
+<script>
+  // غيّر الرابط ده لعنوان الـ backend بتاعكم (Node.js API اللي بينادي على سيرفيس الـ AI)
+  const API_URL = "http://localhost:5000/predict";
+
+  const dropzone   = document.getElementById('dropzone');
+  const fileInput  = document.getElementById('fileInput');
+  const previewWrap= document.getElementById('previewWrap');
+  const previewImg = document.getElementById('previewImg');
+  const scanLine   = document.getElementById('scanLine');
+  const actions    = document.getElementById('actions');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const resetBtn   = document.getElementById('resetBtn');
+  const statusRow  = document.getElementById('statusRow');
+  const errorBox   = document.getElementById('errorBox');
+  const resultBox  = document.getElementById('resultBox');
+  const verdictText= document.getElementById('verdictText');
+  const confidenceText = document.getElementById('confidenceText');
+  const meterFill  = document.getElementById('meterFill');
+  const resultNote = document.getElementById('resultNote');
+
+  let selectedFile = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file){
+    if (!file.type.startsWith('image/')) {
+      showError('الملف ده مش صورة. اختار JPG أو PNG.');
+      return;
+    }
+    hideError();
+    selectedFile = file;
+    const url = URL.createObjectURL(file);
+    previewImg.src = url;
+    previewWrap.style.display = 'block';
+    actions.style.display = 'flex';
+    resultBox.style.display = 'none';
+    statusRow.textContent = '';
+  }
+
+  resetBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    previewWrap.style.display = 'none';
+    actions.style.display = 'none';
+    resultBox.style.display = 'none';
+    statusRow.textContent = '';
+    hideError();
+  });
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    hideError();
+    resultBox.style.display = 'none';
+    setBusy(true, 'بيحلل الصورة...');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+
+      const res = await fetch(API_URL, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('السيرفر رجّع خطأ (' + res.status + ')');
+
+      const data = await res.json();
+      // المتوقع من الـ backend: { label: "real" | "ai", confidence: 0.0-1.0 }
+      showResult(data.label, data.confidence);
+      setBusy(false, 'تم التحليل');
+    } catch (err) {
+      setBusy(false, '');
+      showError('حصل خطأ أثناء التحليل: ' + err.message);
+    }
+  });
+
+  function setBusy(isBusy, message){
+    analyzeBtn.disabled = isBusy;
+    scanLine.style.display = isBusy ? 'block' : 'none';
+    statusRow.innerHTML = message
+      ? `<span class="status-dot ${isBusy ? 'busy' : ''}"></span><span>${message}</span>`
+      : '';
+  }
+
+  function showResult(label, confidence){
+    const isReal = label === 'real';
+    const pct = Math.round(confidence * 100);
+
+    verdictText.textContent = isReal ? 'صورة حقيقية' : 'صورة من AI';
+    verdictText.className = 'verdict ' + (isReal ? 'real' : 'fake');
+    confidenceText.textContent = pct + '٪ ثقة';
+
+    meterFill.className = 'meter-fill ' + (isReal ? 'real' : 'fake');
+    meterFill.style.width = '0%';
+    requestAnimationFrame(() => { meterFill.style.width = pct + '%'; });
+
+    resultNote.textContent = isReal
+      ? 'النظام مالقاش آثار توليد اصطناعي واضحة في الصورة دي.'
+      : 'النظام لقى مؤشرات تدل على إن الصورة اتولدت أو اتعدلت بالذكاء الاصطناعي.';
+
+    resultBox.style.display = 'block';
+  }
+
+  function showError(msg){
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+  }
+  function hideError(){
+    errorBox.style.display = 'none';
+  }
+</script>
+</body>
+</html>
